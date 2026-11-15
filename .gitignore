@@ -1,0 +1,16 @@
+# 실행/생성물
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# 업로드 원본과 렌더 결과 (내 영상이 GitHub에 올라가지 않도록)
+data/
+output/
+fonts/*.ttf
+fonts/*.otf
+fonts/*.ttc
+
+# 에디터
+.vscode/
+.idea/

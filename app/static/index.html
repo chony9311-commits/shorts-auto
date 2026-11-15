@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>🎬 shorts-factory — 쇼츠 자동 제작기</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🎬</span>
+    <div>
+      <h1>shorts-factory</h1>
+      <p>9:16 쇼츠 자동 제작기 · 로컬에서만 돌아갑니다</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div id="health" class="chip chip-warn">확인 중…</div>
+    <div class="seg" id="modeSeg">
+      <button class="seg-btn active" data-mode="shopping">쇼핑 쇼츠</button>
+      <button class="seg-btn" data-mode="celebrity">셀럽 쇼츠</button>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- ================= 왼쪽: 클립 ================= -->
+  <section class="panel col-clips">
+    <h2>1 · 영상 클립</h2>
+    <div id="dropzone" class="dropzone">
+      <input type="file" id="clipInput" accept="video/*" multiple hidden />
+      <p class="dz-title">영상을 끌어다 놓기</p>
+      <p class="dz-sub">또는 클릭해서 선택 (여러 개 한 번에)</p>
+      <p class="dz-sub dim">mp4 · mov · webm · 20~24초 완성이 목표</p>
+    </div>
+    <div id="clipList" class="clip-list"></div>
+    <div id="clipHint" class="hint">클립을 올리면 여기에 순서대로 쌓입니다.</div>
+  </section>
+
+  <!-- ================= 가운데: 미리보기 ================= -->
+  <section class="panel col-preview">
+    <h2>2 · 9:16 미리보기 (그대로 렌더됩니다)</h2>
+    <div class="stage-wrap">
+      <div class="stage">
+        <canvas id="stage" width="540" height="960"></canvas>
+        <div id="stageHint" class="stage-hint">클립을 올려주세요</div>
+      </div>
+      <div class="stage-side">
+        <label class="fld">
+          <span>확대 <b id="zoomVal">100%</b></span>
+          <input type="range" id="zoom" min="100" max="200" step="1" value="100" />
+        </label>
+        <label class="fld">
+          <span>좌우 이동 <b id="panXVal">0</b></span>
+          <input type="range" id="panX" min="-100" max="100" step="1" value="0" />
+        </label>
+        <label class="fld">
+          <span>상하 이동 <b id="panYVal">0</b></span>
+          <input type="range" id="panY" min="-100" max="100" step="1" value="0" />
+        </label>
+        <div class="row">
+          <button id="playBtn" class="btn btn-sm">▶ 재생</button>
+          <button id="resetTransform" class="btn btn-sm btn-ghost">줌·이동 초기화</button>
+        </div>
+        <div class="mask-tools">
+          <h3>원본 자막 · 워터마크 제거</h3>
+          <div class="seg seg-sm" id="maskSeg">
+            <button class="seg-btn active" data-mask="blur">흐리게</button>
+            <button class="seg-btn" data-mask="delogo">주변 픽셀</button>
+            <button class="seg-btn" data-mask="box">덮어쓰기</button>
+          </div>
+          <p class="hint">미리보기 위에서 <b>마우스로 드래그</b>하면 그 영역만 지워집니다. 넓은 자막 띠는 <b>흐리게</b>, 작은 워터마크는 <b>주변 픽셀</b>이 깔끔합니다.</p>
+          <div id="maskList" class="mask-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 오른쪽: 썸네일 / 오디오 / 자막 ================= -->
+  <section class="panel col-settings">
+    <h2>3 · 썸네일 · 상단바</h2>
+    <div id="presetGrid" class="preset-grid"></div>
+
+    <div class="fld-group">
+      <label class="fld">
+        <span>메인 제목 (1줄)</span>
+        <input type="text" id="title1" placeholder="예: **이거 하나로** 80만 원 세이브" />
+      </label>
+      <label class="fld">
+        <span>부제목 (2줄)</span>
+        <input type="text" id="title2" placeholder="예: 쿠팡 반품마켓 실화냐" />
+      </label>
+      <p class="hint"><b>**키워드**</b> 처럼 별표 두 개로 감싸면 형광펜 강조가 들어갑니다.</p>
+
+      <label class="fld">
+        <span>금액·강조 배지 문구</span>
+        <input type="text" id="badgeText" placeholder="예: 80만 원 세이브" />
+      </label>
+      <label class="fld">
+        <span>번호 배지 문구 <em id="badgeNumHint">(비우면 1/3 자동)</em></span>
+        <input type="text" id="badgeNum" placeholder="예: TOP 3" />
+      </label>
+      <label class="fld">
+        <span>출처 태그 (셀럽 모드)</span>
+        <input type="text" id="credit" placeholder="예: @초몰입 벤치마크" />
+      </label>
+
+      <label class="fld">
+        <span>폰트 크기 <b id="fontScaleVal">1.0x</b></span>
+        <input type="range" id="fontScale" min="60" max="140" step="5" value="100" />
+      </label>
+      <label class="fld">
+        <span>배경 딤 (영상·썸네일 공통) <b id="dimVal">0%</b></span>
+        <input type="range" id="dim" min="0" max="80" step="5" value="0" />
+      </label>
+    </div>
+
+    <div class="sub-panel">
+      <h3>썸네일 PNG 따로 뽑기</h3>
+      <label class="fld">
+        <span>썸네일 바탕</span>
+        <select id="thumbSource">
+          <option value="frame">현재 클립의 프레임 캡처</option>
+          <option value="image">직접 올린 이미지</option>
+        </select>
+      </label>
+      <label class="fld" id="thumbTimeWrap">
+        <span>캡처 시점(초)</span>
+        <input type="number" id="thumbTime" min="0" step="0.1" placeholder="비우면 30% 지점" />
+      </label>
+      <label class="fld" id="thumbImageWrap" hidden>
+        <span>썸네일 이미지 업로드</span>
+        <input type="file" id="thumbImageInput" accept="image/*" />
+      </label>
+      <label class="chk"><input type="checkbox" id="thumbAsIs" /> 텍스트 없이 이미지 그대로 쓰기</label>
+      <label class="chk"><input type="checkbox" id="thumbPrepend" /> 렌더 영상 앞에 썸네일 <input type="number" id="prependDur" class="tiny" value="1" min="0.2" max="5" step="0.1" />초 넣기</label>
+      <button id="thumbBtn" class="btn btn-sm">썸네일 PNG 만들기</button>
+      <div id="thumbResult" class="thumb-result" hidden>
+        <img id="thumbPreview" alt="썸네일 미리보기" />
+        <a id="thumbDownload" class="btn btn-sm btn-ghost" href="#" download>PNG 다운로드</a>
+      </div>
+    </div>
+
+    <h2>4 · 음성 · 자막</h2>
+    <div class="fld-group">
+      <div class="seg seg-sm" id="audioSeg">
+        <button class="seg-btn active" data-audio="clip">원본음</button>
+        <button class="seg-btn" data-audio="tts">TTS 만들기</button>
+        <button class="seg-btn" data-audio="file">외부 MP3</button>
+      </div>
+
+      <div id="ttsBox" class="sub-panel" hidden>
+        <textarea id="ttsText" rows="3" placeholder="읽을 대본을 붙여넣으세요"></textarea>
+        <div class="row">
+          <select id="ttsVoice" class="grow"></select>
+          <select id="ttsRate">
+            <option value="+0%">보통</option>
+            <option value="+10%">조금 빠르게</option>
+            <option value="+20%">빠르게</option>
+            <option value="-10%">느리게</option>
+          </select>
+        </div>
+        <button id="ttsBtn" class="btn btn-sm">음성 만들기</button>
+      </div>
+
+      <div id="fileBox" class="sub-panel" hidden>
+        <input type="file" id="audioInput" accept="audio/*" />
+        <p class="hint">타입캐스트 · 일레븐랩스에서 받은 mp3/wav를 그대로 올리면 됩니다.</p>
+      </div>
+
+      <div id="audioList" class="audio-list"></div>
+
+      <label class="fld">
+        <span>음량 <b id="volumeVal">100%</b></span>
+        <input type="range" id="volume" min="0" max="200" step="5" value="100" />
+      </label>
+
+      <label class="chk"><input type="checkbox" id="subEnabled" checked /> 자막 굽기</label>
+      <div class="row">
+        <button id="subAutoBtn" class="btn btn-sm">자동 자막 (whisper)</button>
+        <label class="chk"><input type="checkbox" id="subWord" /> 단어 단위로 끊기</label>
+      </div>
+      <input type="file" id="subInput" accept=".srt,.ass,.ssa,.vtt" />
+      <p id="subStatus" class="hint">자막 없음</p>
+    </div>
+  </section>
+</main>
+
+<!-- ================= 하단 실행바 ================= -->
+<footer class="runbar">
+  <div class="run-info">
+    <span id="totalDur" class="mono">총 0.0초</span>
+    <span id="durBadge" class="chip">20~24초 권장</span>
+    <span id="segCount" class="dim">0컷</span>
+  </div>
+  <div class="run-actions">
+    <div class="progress" id="progressWrap" hidden>
+      <div class="bar"><i id="progressBar"></i></div>
+      <span id="progressText">0%</span>
+    </div>
+    <a id="downloadLink" class="btn btn-ghost" href="#" hidden download>MP4 다운로드</a>
+    <button id="renderBtn" class="btn btn-primary">렌더링 시작</button>
+  </div>
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+
+<video id="hiddenVideo" style="display:none" playsinline></video>
+<script src="/static/app.js"></script>
+</body>
+</html>
