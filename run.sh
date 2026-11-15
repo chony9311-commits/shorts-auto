@@ -28,7 +28,7 @@ source .venv/bin/activate
 
 # 2) 의존성 (requirements.txt 가 바뀔 때만 설치)
 STAMP=".venv/.requirements.sha"
-NEW_SHA="$(shasum -a 1 requirements.txt 2>/dev/null | awk '{print $1}')"
+NEW_SHA="$("$PY_BIN" -c "import hashlib;print(hashlib.sha1(open('requirements.txt','rb').read()).hexdigest())")"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$NEW_SHA" ]; then
   echo "📦 의존성 설치…"
   python -m pip install --upgrade pip >/dev/null
