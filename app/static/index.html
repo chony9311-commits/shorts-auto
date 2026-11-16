@@ -47,6 +47,21 @@
         <div id="stageHint" class="stage-hint">클립을 올려주세요</div>
       </div>
       <div class="stage-side">
+        <div class="tool-bar">
+          <div class="seg seg-sm" id="toolSeg" title="캔버스 조작 모드">
+            <button class="seg-btn active" data-tool="move" title="드래그로 화면 이동 · ⌘+휠/핀치로 확대 (단축키 V)">✋ 이동</button>
+            <button class="seg-btn" data-tool="mask" title="드래그로 지울 영역 그리기 (단축키 M)">▭ 가림</button>
+            <button class="seg-btn" data-tool="select" title="가림 박스 선택·이동·크기조절 (단축키 S)">⬚ 선택</button>
+          </div>
+          <div class="row tool-row">
+            <label class="chk"><input type="checkbox" id="safeToggle" /> 안전영역</label>
+            <button id="undoBtn" class="btn btn-sm btn-ghost" title="되돌리기 (⌘Z)">↶ 되돌리기</button>
+            <button id="redoBtn" class="btn btn-sm btn-ghost" title="다시 실행 (⌘⇧Z)">↷</button>
+          </div>
+          <div id="timeRead" class="mono dim time-read"></div>
+          <p id="toolHint" class="hint"></p>
+          <div id="safeWarn" class="safe-warn" hidden></div>
+        </div>
         <label class="fld">
           <span>확대 <b id="zoomVal">100%</b></span>
           <input type="range" id="zoom" min="100" max="200" step="1" value="100" />
@@ -70,7 +85,7 @@
             <button class="seg-btn" data-mask="delogo">주변 픽셀</button>
             <button class="seg-btn" data-mask="box">덮어쓰기</button>
           </div>
-          <p class="hint">미리보기 위에서 <b>마우스로 드래그</b>하면 그 영역만 지워집니다. 넓은 자막 띠는 <b>흐리게</b>, 작은 워터마크는 <b>주변 픽셀</b>이 깔끔합니다.</p>
+          <p class="hint">위 도구에서 <b>▭ 가림</b>을 고른 뒤 미리보기를 <b>드래그</b>하면 그 영역만 지워집니다. 넓은 자막 띠는 <b>흐리게</b>, 작은 워터마크는 <b>주변 픽셀</b>이 깔끔합니다. 만든 박스는 <b>⬚ 선택</b>으로 옮기고 크기를 바꿀 수 있어요.</p>
           <div id="maskList" class="mask-list"></div>
         </div>
       </div>
