@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import json
 import shutil
 import threading
@@ -38,7 +39,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import settings, store, subtitles
+from . import bot, pipeline, script_gen, scraper, settings, source_fetcher, store, subtitles
+from .batch_queue import BatchQueue
 from .presets import TITLE_PRESETS, list_font_files, presets_public, resolve_font
 from .render import (RenderError, media_tools_ready, probe_duration, probe_media,
                      render_thumbnail, render_video)
@@ -119,6 +121,10 @@ def api_state() -> Dict[str, Any]:
             {"key": "celebrity", "label": "셀럽 쇼츠", "hint": "@초몰입 벤치마크 · 출처/제품명 태그"},
         ],
         "voices": KOREAN_VOICES,
+        "subtitle_presets": [{"key": k, "label": v.get("label", k)} for k, v in subtitles.SUBTITLE_PRESETS.items()],
+        "default_subtitle_preset": subtitles.DEFAULT_AUTO_SUBTITLE_PRESET,
+        "auto": {"voices": script_gen.VOICES, "rate": script_gen.DEFAULT_RATE,
+                 "crop_pct": source_fetcher.CROP_DEFAULT, "telegram": bool(os.getenv("TELEGRAM_BOT_TOKEN"))},
         "max_upload_mb": settings.MAX_UPLOAD_MB,
     }
 
@@ -371,6 +377,103 @@ def api_download_thumb(tid: str) -> FileResponse:
     if not out.exists():
         raise HTTPException(404, "썸네일 없음")
     return FileResponse(out, media_type="image/png", filename=f"thumbnail_{tid}.png")
+
+
+# ------------------------------------------------------------------ 완전자동 · 일괄 제작
+BATCH = BatchQueue()
+
+
+def _auto_defaults(p: Dict[str, Any]) -> Dict[str, Any]:
+    """폼 공통 옵션(성우·속도·크롭·자막)만 추려 요청에 병합한다."""
+    keys = ("voice", "rate", "crop_pct", "subtitle_style", "title_preset", "auto_search")
+    return {k: p[k] for k in keys if p.get(k) not in (None, "")}
+
+
+@app.post("/api/product/preview")
+def api_product_preview(payload: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+    """링크 하나를 읽어 상품명·가격·특징·키워드를 미리 보여 준다(막히면 manual_needed)."""
+    url = str(payload.get("url") or "").strip()
+    try:
+        info = scraper.fetch_product(url)
+    except scraper.ScrapeBlocked as exc:
+        return {"ok": False, "manual_needed": True, "message": str(exc)}
+    except scraper.ScrapeError as exc:
+        return {"ok": False, "manual_needed": False, "message": str(exc)}
+    kw = source_fetcher.build_keywords(info)
+    return {"ok": True, "product": info.to_dict(), "keywords": kw,
+            "search_links": source_fetcher.manual_search_links(kw)}
+
+
+@app.post("/api/batch")
+def api_batch_create(payload: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+    """링크(줄바꿈 구분) 여러 개 -> 큐 등록. 줄에 '상품명 | 특징 | 가격' 이면 직접 입력 항목."""
+    ok, msg = media_tools_ready()
+    if not ok:
+        raise HTTPException(500, msg)
+    common = _auto_defaults(payload)
+    extra = [u for u in (payload.get("extra_urls") or []) if str(u).strip()]
+    added: List[Dict[str, Any]] = []
+    lines = [ln.strip() for ln in str(payload.get("text") or "").splitlines() if ln.strip()]
+    pending_url: Optional[str] = None
+    entries: List[Dict[str, Any]] = []
+    for ln in lines:
+        urls = scraper.extract_urls(ln)
+        manual = None if urls else pipeline.parse_manual_text(ln)
+        if urls:
+            if pending_url:
+                entries.append({"url": pending_url})
+            pending_url = urls[0]
+        elif manual and pending_url:          # 바로 윗줄 URL의 직접 입력 보정
+            entries.append({"url": pending_url, "manual": manual})
+            pending_url = None
+        elif manual:
+            entries.append({"manual": manual})
+    if pending_url:
+        entries.append({"url": pending_url})
+    if not entries:
+        raise HTTPException(400, "상품 링크가 없습니다. 한 줄에 하나씩 붙여 넣어 주세요.")
+    if len(entries) > 30:
+        raise HTTPException(400, "한 번에 30개까지만 등록할 수 있어요.")
+    for e in entries:
+        req = {**common, **e, "extra_urls": extra}
+        added.append(BATCH.add(req, label=pipeline.AutoRequest.from_dict(req).label()))
+    return {"items": added}
+
+
+@app.get("/api/batch")
+def api_batch_list() -> Dict[str, Any]:
+    items = []
+    for it in BATCH.list():
+        slim = {k: v for k, v in it.items() if k not in ("request", "result")}
+        res = it.get("result") or {}
+        slim["warnings"] = res.get("warnings", [])
+        slim["script"] = res.get("script", [])
+        slim["duration"] = res.get("duration")
+        slim["search_links"] = res.get("search_links", {})
+        items.append(slim)
+    return {"items": items}
+
+
+@app.post("/api/batch/{item_id}/retry")
+def api_batch_retry(item_id: str, payload: Dict[str, Any] = Body(default={})) -> Dict[str, Any]:
+    manual = None
+    if payload.get("name"):
+        manual = {"name": payload["name"], "features": payload.get("features", ""), "price": payload.get("price", "")}
+    if not BATCH.retry(item_id, manual):
+        raise HTTPException(400, "다시 시도할 수 없는 상태입니다.")
+    return {"ok": True}
+
+
+@app.delete("/api/batch/{item_id}")
+def api_batch_delete(item_id: str) -> Dict[str, Any]:
+    if not BATCH.remove(item_id):
+        raise HTTPException(400, "진행 중인 항목은 지울 수 없어요.")
+    return {"ok": True}
+
+
+@app.on_event("startup")
+def _start_bot() -> None:
+    bot.start_in_background(BATCH)         # TELEGRAM_BOT_TOKEN 이 있을 때만 동작
 
 
 # ------------------------------------------------------------------ 정적 UI

@@ -25,7 +25,8 @@ UI가 보내는 프로젝트 JSON -> 9:16(1080x1920) MP4 / 썸네일 PNG.
             "font_scale": 1.0, "dim": 0.0},
   "badges": {"enabled": true, "color": "0xFFE100"},
   "audio": {"source": "clip|tts|file", "audio_id": "...", "volume": 1.0},
-  "subtitles": {"enabled": true, "subtitle_id": "..."},
+  "subtitles": {"enabled": true, "subtitle_id": "...",
+                "style": "default|reels_center"},   # style 은 기록용(스타일은 ASS 생성 시점에 정해진다)
   "thumbnail": {"prepend": true, "prepend_duration": 1.0, "dim": 0.35,
                 "source": {"type": "frame|image", "clip_id": "...", "time": 1.2,
                             "image_id": "...", "as_is": false}}
@@ -527,6 +528,17 @@ def render_thumbnail(project: Dict[str, Any], out_path: Path,
     return out_path
 
 
+def _subtitle_fonts_dir() -> Optional[Path]:
+    """fonts/ 에 폰트 파일이 있으면 ASS 렌더(libass)가 그 폴더에서도 폰트를 찾게 한다."""
+    d = settings.FONT_DIR
+    try:
+        if d.exists() and any(p.suffix.lower() in (".ttf", ".otf", ".ttc") for p in d.iterdir()):
+            return d
+    except OSError:
+        pass
+    return None
+
+
 # ------------------------------------------------------------------ 본 렌더
 def render_video(project: Dict[str, Any], out_path: Path,
                  progress: Optional[Callable[[float, str], None]] = None) -> Dict[str, Any]:
@@ -638,7 +650,9 @@ def render_video(project: Dict[str, Any], out_path: Path,
     if sub_cfg.get("enabled", True) and sub_cfg.get("subtitle_id"):
         sp = store.subtitle_path(sub_cfg.get("subtitle_id"))
         if sp:
-            filters.append(f"{vcat}ass=filename={_esc_path(sp)}[vsub]")
+            fdir = _subtitle_fonts_dir()
+            fd_opt = f":fontsdir={_esc_path(fdir)}" if fdir else ""
+            filters.append(f"{vcat}ass=filename={_esc_path(sp)}{fd_opt}[vsub]")
             vout = "[vsub]"
 
     # ---------- 5) 오디오 체인

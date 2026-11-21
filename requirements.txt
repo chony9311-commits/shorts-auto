@@ -4,6 +4,14 @@ python-multipart>=0.0.9
 edge-tts>=6.1.9
 pillow>=10.0
 
+# ---- 완전자동 파이프라인 (상품 링크 -> MP4) ----
+requests>=2.31
+beautifulsoup4>=4.12
+lxml>=5.0
+yt-dlp>=2024.8.6
+python-telegram-bot>=20.7      # 텔레그램 봇(선택). TELEGRAM_BOT_TOKEN 이 없으면 로드하지 않음
+# deep-translator>=1.11        # 선택: 사전에 없는 단어를 중국어/영어 검색어로 자동 번역(키 불필요)
+
 # ---- 선택 설치 (자동 자막을 쓸 때만) ----
 #   pip install faster-whisper
 #   첫 실행 시 모델(small 약 500MB)을 자동으로 내려받습니다.
