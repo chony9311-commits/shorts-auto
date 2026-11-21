@@ -9,6 +9,24 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def load_dotenv(path: Path | None = None) -> None:
+    """의존성 없는 .env 로더. 이미 설정된 환경변수는 덮어쓰지 않는다."""
+    path = path or (BASE_DIR / ".env")
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key, val = key.strip().removeprefix("export ").strip(), val.strip().strip("'\"")
+        if key and key not in os.environ:
+            os.environ[key] = val
+
+
+load_dotenv()
+
 DATA_DIR = Path(os.getenv("SHORTS_DATA_DIR", BASE_DIR / "data")).resolve()
 CLIP_DIR = DATA_DIR / "clips"
 AUDIO_DIR = DATA_DIR / "audio"

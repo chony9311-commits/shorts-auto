@@ -16,6 +16,10 @@
     </div>
   </div>
   <div class="topbar-right">
+    <div class="seg" id="viewSeg">
+      <button class="seg-btn active" data-view="editor">수동 편집</button>
+      <button class="seg-btn" data-view="batch">일괄 제작 (자동)</button>
+    </div>
     <div id="health" class="chip chip-warn">확인 중…</div>
     <div class="seg" id="modeSeg">
       <button class="seg-btn active" data-mode="shopping">쇼핑 쇼츠</button>
@@ -24,7 +28,50 @@
   </div>
 </header>
 
-<main class="layout">
+<section id="batchView" class="batch-view" hidden>
+  <div class="batch-grid">
+    <div class="panel">
+      <h2>🔗 상품 링크로 완전자동 제작</h2>
+      <p class="hint">한 줄에 링크 하나. 쿠팡·네이버가 막히면 링크 <b>바로 아랫줄</b>에 <code>상품명 | 특징1, 특징2 | 19,800원</code> 을 적으면 돼요. 링크 없이 그 형식만 써도 됩니다.</p>
+      <textarea id="bLinks" rows="8" placeholder="https://www.coupang.com/vp/products/...&#10;https://smartstore.naver.com/...&#10;미니 믹서기 | 원터치 세척, USB 충전 | 15,900원"></textarea>
+      <div class="row3">
+        <label>성우
+          <select id="bVoice"><option value="female">여성 · 선히</option><option value="male">남성 · 인준</option></select>
+        </label>
+        <label>말 속도 <b id="bRateV">+18%</b>
+          <input id="bRate" type="range" min="15" max="20" value="18">
+        </label>
+        <label>크롭 <b id="bCropV">115%</b>
+          <input id="bCrop" type="range" min="100" max="130" value="115">
+        </label>
+      </div>
+      <div class="row3">
+        <label>자막
+          <select id="bSub"><option value="reels_clean">깔끔 · 노랑 강조 (55%)</option><option value="reels_center">릴스 중앙 · 굵은 외곽선</option><option value="default">기본 (하단)</option></select>
+        </label>
+        <label>자막 폰트
+          <select id="bFont"><option value="">자동 (시스템 고딕)</option></select>
+        </label>
+        <label>제목바
+          <select id="bTitle"><option value="kkultem">꿀템담아형</option><option value="chomolip">@초몰입형</option><option value="mypick">마이픽형</option><option value="simple">심플</option></select>
+        </label>
+        <label class="chk"><input id="bBar" type="checkbox"> 상단 제목바 넣기</label>
+        <label class="chk"><input id="bAuto" type="checkbox" checked> 유튜브/빌리빌리 자동 검색</label>
+      </div>
+      <label>추가 영상 URL (샤오홍슈·도우인·틱톡·유튜브 등, 한 줄에 하나 — 선택)
+        <textarea id="bExtra" rows="3" placeholder="https://www.douyin.com/video/...&#10;https://www.xiaohongshu.com/explore/..."></textarea>
+      </label>
+      <button id="bGo" class="btn btn-primary">큐에 넣고 자동 제작 시작</button>
+      <p class="hint" id="bTg"></p>
+    </div>
+    <div class="panel">
+      <h2>📋 제작 큐 <small class="hint">(순서대로 1개씩 렌더)</small></h2>
+      <div id="bList" class="blist"><p class="hint">아직 없어요.</p></div>
+    </div>
+  </div>
+</section>
+
+<main class="layout" id="editorView">
   <!-- ================= 왼쪽: 클립 ================= -->
   <section class="panel col-clips">
     <h2>1 · 영상 클립</h2>
@@ -47,6 +94,21 @@
         <div id="stageHint" class="stage-hint">클립을 올려주세요</div>
       </div>
       <div class="stage-side">
+        <div class="tool-bar">
+          <div class="seg seg-sm" id="toolSeg" title="캔버스 조작 모드">
+            <button class="seg-btn active" data-tool="move" title="드래그로 화면 이동 · ⌘+휠/핀치로 확대 (단축키 V)">✋ 이동</button>
+            <button class="seg-btn" data-tool="mask" title="드래그로 지울 영역 그리기 (단축키 M)">▭ 가림</button>
+            <button class="seg-btn" data-tool="select" title="가림 박스 선택·이동·크기조절 (단축키 S)">⬚ 선택</button>
+          </div>
+          <div class="row tool-row">
+            <label class="chk"><input type="checkbox" id="safeToggle" /> 안전영역</label>
+            <button id="undoBtn" class="btn btn-sm btn-ghost" title="되돌리기 (⌘Z)">↶ 되돌리기</button>
+            <button id="redoBtn" class="btn btn-sm btn-ghost" title="다시 실행 (⌘⇧Z)">↷</button>
+          </div>
+          <div id="timeRead" class="mono dim time-read"></div>
+          <p id="toolHint" class="hint"></p>
+          <div id="safeWarn" class="safe-warn" hidden></div>
+        </div>
         <label class="fld">
           <span>확대 <b id="zoomVal">100%</b></span>
           <input type="range" id="zoom" min="100" max="200" step="1" value="100" />
@@ -70,7 +132,7 @@
             <button class="seg-btn" data-mask="delogo">주변 픽셀</button>
             <button class="seg-btn" data-mask="box">덮어쓰기</button>
           </div>
-          <p class="hint">미리보기 위에서 <b>마우스로 드래그</b>하면 그 영역만 지워집니다. 넓은 자막 띠는 <b>흐리게</b>, 작은 워터마크는 <b>주변 픽셀</b>이 깔끔합니다.</p>
+          <p class="hint">위 도구에서 <b>▭ 가림</b>을 고른 뒤 미리보기를 <b>드래그</b>하면 그 영역만 지워집니다. 넓은 자막 띠는 <b>흐리게</b>, 작은 워터마크는 <b>주변 픽셀</b>이 깔끔합니다. 만든 박스는 <b>⬚ 선택</b>으로 옮기고 크기를 바꿀 수 있어요.</p>
           <div id="maskList" class="mask-list"></div>
         </div>
       </div>
@@ -208,5 +270,6 @@
 
 <video id="hiddenVideo" style="display:none" playsinline></video>
 <script src="/static/app.js"></script>
+<script src="/static/batch.js"></script>
 </body>
 </html>
