@@ -36,7 +36,7 @@ def test_full_pipeline_renders_mp4(deps):
     assert seen[-1] == 100 and seen == sorted(seen)
     # 자막(.ass)은 전부 reels_center, 문장 타임라인과 1:1
     proj = json.loads((settings.JOB_DIR / "e2e1" / "project.json").read_text(encoding="utf-8"))
-    assert proj["subtitles"]["style"] == "reels_center" and proj["audio"]["source"] == "file"
+    assert proj["subtitles"]["style"] == "reels_clean" and proj["audio"]["source"] == "file"
     assert res["timeline"][0]["start"] < 0.1
     # 컷 길이 1.5~2.5초(조각 합 기준 컷 수 확인)
     assert res["cuts"] >= 8

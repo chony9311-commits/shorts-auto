@@ -47,7 +47,7 @@
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text, voice: $("bVoice").value, rate: "+" + $("bRate").value + "%", crop_pct: +$("bCrop").value,
-          subtitle_style: $("bSub").value, title_preset: $("bTitle").value, auto_search: $("bAuto").checked,
+          subtitle_style: $("bSub").value, title_preset: $("bTitle").value, title_bar: $("bBar").checked, auto_search: $("bAuto").checked,
           extra_urls: $("bExtra").value.split(/\n+/).map((x) => x.trim()).filter(Boolean),
         }),
       });

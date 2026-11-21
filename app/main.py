@@ -385,7 +385,7 @@ BATCH = BatchQueue()
 
 def _auto_defaults(p: Dict[str, Any]) -> Dict[str, Any]:
     """폼 공통 옵션(성우·속도·크롭·자막)만 추려 요청에 병합한다."""
-    keys = ("voice", "rate", "crop_pct", "subtitle_style", "title_preset", "auto_search")
+    keys = ("voice", "rate", "crop_pct", "subtitle_style", "title_preset", "title_bar", "auto_search")
     return {k: p[k] for k in keys if p.get(k) not in (None, "")}
 
 

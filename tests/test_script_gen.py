@@ -85,3 +85,12 @@ def test_too_short_script_gets_reserve_lines():
     short = dict(s, lines=s["lines"][:6] + [s["lines"][-1]])
     vt = sg.synthesize_script(short, backend=FakeTts())
     assert len(vt.lines) > 7 and vt.duration >= 20 - 0.5
+
+
+def test_reels_clean_ass_emphasis(tmp_path):
+    from app import subtitles
+    out = subtitles.build_preset_ass("reels_clean", [{"start": 0, "end": 2, "text": "이거 진짜 미쳤는데"},
+                                                      {"start": 2, "end": 4, "text": "물만 뿌려주면 끝나"}], tmp_path / "c.ass")
+    txt = out.read_text(encoding="utf-8")
+    assert "\\1c&H0000E1FF&" in txt and "\\pos(540,1056)" in txt and "Outline" in txt
+    assert subtitles.DEFAULT_AUTO_SUBTITLE_PRESET == "reels_clean"

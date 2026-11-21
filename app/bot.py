@@ -141,6 +141,9 @@ class BotService:
             cap = f"✅ 완료: {item['label']} · {res.get('duration', 0):.1f}초"
             if res.get("warnings"):
                 cap += "\n⚠️ " + " / ".join(res["warnings"][:3])
+            thumb = res.get("thumbnail")
+            if thumb and Path(thumb).is_file() and hasattr(self.sender, "send_photo"):
+                self.sender.send_photo(chat_id, thumb, "썸네일")
             if path.is_file() and path.stat().st_size <= TG_VIDEO_LIMIT:
                 self.sender.send_video(chat_id, str(path), cap[:1000])
             else:
@@ -162,6 +165,12 @@ class _PtbSender:
 
     def send_text(self, chat_id: int, text: str) -> None:
         self._run(self.app.bot.send_message(chat_id=chat_id, text=text))
+
+    def send_photo(self, chat_id: int, path: str, caption: str) -> None:
+        async def go() -> None:
+            with open(path, "rb") as fh:
+                await self.app.bot.send_photo(chat_id=chat_id, photo=fh, caption=caption)
+        self._run(go())
 
     def send_video(self, chat_id: int, path: str, caption: str) -> None:
         async def go() -> None:

@@ -168,8 +168,13 @@ SUBTITLE_PRESETS: Dict[str, Dict[str, Any]] = {
         "desc": "정중앙 아래(55%) · 굵은 고딕 72px · 외곽선 5 · 그림자 2 · 1줄씩 짧게",
         "size": 72, "outline": 5, "shadow": 2, "y_ratio": 0.55, "chunk_chars": 9,
     },
+    "reels_clean": {
+        "label": "깔끔 (노랑 강조)",
+        "desc": "정중앙 · 굵은 고딕 흰 글씨 + 얇은 외곽선 + 부드러운 그림자 · 핵심어는 노랑·크게",
+        "size": 72, "outline": 2, "shadow": 3, "y_ratio": 0.55, "chunk_chars": 9, "emph_scale": 1.25,
+    },
 }
-DEFAULT_AUTO_SUBTITLE_PRESET = "reels_center"
+DEFAULT_AUTO_SUBTITLE_PRESET = "reels_clean"
 
 REELS_HEADER = """[Script Info]
 ScriptType: v4.00+
@@ -305,8 +310,46 @@ def build_reels_center_ass(segments: Iterable[Dict[str, Any]], out_path: Path,
     return out_path
 
 
+# 노랑 강조 대상(자동): 숫자·가격, 감탄/핵심 키워드
+_EMPH_WORDS = ("진짜", "미쳤", "대박", "무조건", "꿀템", "손해", "실화", "공짜", "최고", "끝", "충격", "할인", "세일")
+_EMPH_YELLOW = "&H0000E1FF&"          # #FFE100 (ASS 는 BGR 순서)
+
+
+def is_emphasis(chunk: str) -> bool:
+    return bool(re.search(r"\d", chunk)) or any(w in chunk for w in _EMPH_WORDS)
+
+
+def build_reels_clean_ass(segments: Iterable[Dict[str, Any]], out_path: Path, font: Optional[str] = None,
+                          size: int = 72, outline: int = 2, shadow: int = 3, y_ratio: float = 0.55,
+                          chunk_chars: int = 9, emph_scale: float = 1.25) -> Path:
+    """깔끔 버전: 얇은 외곽선 + 부드러운 그림자, 핵심어(숫자·키워드·**표시**)는 노랑 + 크게."""
+    size = int(max(68, min(76, size)))
+    font = font or pick_sub_font()[0]
+    header = REELS_HEADER.format(font=font, size=size, outline=int(outline), shadow=int(shadow))
+    header = header.replace("&H78000000", "&H96000000")        # 그림자 색(반투명 검정)
+    y = int(round(1920 * max(0.3, min(0.8, y_ratio))))
+    lines: List[str] = [header]
+    for ev in reels_events(segments, chunk_chars):
+        raw = ev["text"]
+        marked = "**" in raw
+        text = _clean(raw.replace("**", ""))
+        emph = marked or is_emphasis(text)
+        tag = f"\\1c{_EMPH_YELLOW}\\fs{int(size * emph_scale)}" if emph else ""
+        lines.append(
+            f"Dialogue: 0,{_ts(ev['start'])},{_ts(ev['end'])},Reels,,0,0,0,,"
+            f"{{\\an5\\pos(540,{y})\\blur1\\fad(40,30){tag}}}{text}"
+        )
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out_path
+
+
 def build_preset_ass(preset: str, segments: Iterable[Dict[str, Any]], out_path: Path, **kw: Any) -> Path:
     """프리셋 이름으로 ASS 를 만든다('default' 는 기존 하단 자막)."""
+    if preset == "reels_clean":
+        opts = {k: v for k, v in SUBTITLE_PRESETS["reels_clean"].items() if k in
+                ("size", "outline", "shadow", "y_ratio", "chunk_chars", "emph_scale")}
+        opts.update(kw)
+        return build_reels_clean_ass(segments, out_path, **opts)
     if preset == "reels_center":
         opts = {k: v for k, v in SUBTITLE_PRESETS["reels_center"].items() if k in
                 ("size", "outline", "shadow", "y_ratio", "chunk_chars")}

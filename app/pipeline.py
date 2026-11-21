@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from . import cutter, script_gen, settings, store, subtitles
+from . import cutter, script_gen, settings, store, subtitles, thumb_text
 from .render import RenderError, render_video
 from .scraper import (ProductInfo, ScrapeBlocked, ScrapeError, extract_urls, fetch_html,
                       fetch_product, product_from_manual)
@@ -44,6 +44,7 @@ class AutoRequest:
     rate: str = script_gen.DEFAULT_RATE
     crop_pct: int = CROP_DEFAULT
     subtitle_style: str = subtitles.DEFAULT_AUTO_SUBTITLE_PRESET
+    title_bar: bool = False             # 상단 제목바(기본 꺼짐: 깔끔 버전)
     title_preset: str = "kkultem"
     auto_search: bool = True
     seed: Optional[int] = None
@@ -161,9 +162,9 @@ def run_pipeline(req: AutoRequest, job_id: str, *, progress: Optional[Progress] 
         project: Dict[str, Any] = {
             "mode": "shopping", "width": settings.OUT_W, "height": settings.OUT_H, "fps": settings.OUT_FPS,
             "clips": render_clips,
-            "title": {"enabled": True, "preset": req.title_preset,
+            "title": {"enabled": bool(req.title_bar), "preset": req.title_preset,
                       "lines": [title_lines[0], "이거 꿀템 발견" if product.price_text else title_lines[1]],
-                      "badge_text": product.price_text, "badge_number_text": "",
+                      "badge_text": product.price_text if req.title_bar else "", "badge_number_text": "",
                       "font_scale": 1.0, "dim": 0.0},
             "badges": {"enabled": False},
             "audio": {"source": "file", "audio_id": voice.audio_id, "volume": 1.0},
@@ -175,7 +176,21 @@ def run_pipeline(req: AutoRequest, job_id: str, *, progress: Optional[Progress] 
         # 5) 렌더
         say(66, "영상 렌더링 중")
         result = render_video(project, out_path, lambda p, n: say(66 + 33 * p, "영상 렌더링 중"))
+        # 썸네일: 제목바 없이 글씨만 (영상 앞부분 프레임 + 큰 글씨)
+        thumb_path = settings.OUTPUT_DIR / f"shorts_{job_id}_thumb.png"
+        try:
+            frame = job_dir / "thumb_base.png"
+            first = render_clips[0]                       # 자막이 안 박힌 원본(변환본) 프레임을 쓴다
+            cmeta = store.clip_meta(first["clip_id"])
+            thumb_text.grab_frame(Path(cmeta["path"]), float(first["start"]) + 0.4, frame)
+            hook = [f"**{title_lines[0].replace('**', '')}**",
+                    product.price_text or title_lines[1].replace("**", "")]
+            thumb_text.make_text_thumbnail(frame, hook, thumb_path)
+        except Exception as exc:  # noqa: BLE001  썸네일 실패가 영상 결과를 막으면 안 됨
+            warnings.append(f"썸네일을 만들지 못했어요: {exc}")
+            thumb_path = None
         info = {
+            "thumbnail": str(thumb_path) if thumb_path else None,
             "path": str(out_path), "duration": result["duration"], "cuts": len(cuts),
             "pieces": len(pieces), "voice": voice.voice, "rate": voice.rate,
             "product": product.to_dict(), "script": [x["text"] for x in voice.lines],
