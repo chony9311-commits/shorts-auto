@@ -21,6 +21,8 @@
   $("bCrop").addEventListener("input", () => { $("bCropV").textContent = $("bCrop").value + "%"; });
 
   fetch("/api/state").then((r) => r.json()).then((s) => {
+    $("bFont").innerHTML = '<option value="">자동 (시스템 고딕)</option>' + (s.sub_fonts || []).map((f) =>
+      `<option value="${f.key}" ${f.installed ? "" : "disabled"}>${f.label}${f.installed ? "" : " — 미설치"}</option>`).join("");
     $("bTg").textContent = s.auto && s.auto.telegram
       ? "📨 텔레그램 봇 연결됨 — 봇에 링크를 보내도 같은 큐에서 제작돼요."
       : "텔레그램 연동: .env 에 TELEGRAM_BOT_TOKEN 을 넣고 서버를 다시 켜면 봇으로도 링크를 보낼 수 있어요.";
@@ -47,7 +49,7 @@
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text, voice: $("bVoice").value, rate: "+" + $("bRate").value + "%", crop_pct: +$("bCrop").value,
-          subtitle_style: $("bSub").value, title_preset: $("bTitle").value, title_bar: $("bBar").checked, auto_search: $("bAuto").checked,
+          subtitle_style: $("bSub").value, title_preset: $("bTitle").value, title_bar: $("bBar").checked, sub_font: $("bFont").value, auto_search: $("bAuto").checked,
           extra_urls: $("bExtra").value.split(/\n+/).map((x) => x.trim()).filter(Boolean),
         }),
       });

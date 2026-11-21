@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from . import cutter, script_gen, settings, store, subtitles, thumb_text
+from . import cutter, fonts as fontcat, script_gen, settings, store, subtitles, thumb_text
 from .render import RenderError, render_video
 from .scraper import (ProductInfo, ScrapeBlocked, ScrapeError, extract_urls, fetch_html,
                       fetch_product, product_from_manual)
@@ -44,6 +44,7 @@ class AutoRequest:
     rate: str = script_gen.DEFAULT_RATE
     crop_pct: int = CROP_DEFAULT
     subtitle_style: str = subtitles.DEFAULT_AUTO_SUBTITLE_PRESET
+    sub_font: str = ""                   # fonts.FONT_CATALOG 키 (비우면 자동)
     title_bar: bool = False             # 상단 제목바(기본 꺼짐: 깔끔 버전)
     title_preset: str = "kkultem"
     auto_search: bool = True
@@ -156,7 +157,15 @@ def run_pipeline(req: AutoRequest, job_id: str, *, progress: Optional[Progress] 
         render_clips = cutter.to_render_clips(pieces)
 
         sid = store.new_id()
-        subtitles.build_preset_ass(req.subtitle_style, voice.timeline, settings.SUB_DIR / f"{sid}.ass")
+        chosen = fontcat.resolve(req.sub_font) if req.sub_font else None
+        if req.sub_font and not chosen:
+            warnings.append("고른 폰트가 fonts/ 에 없어 기본 폰트로 만들었어요. python scripts/download_fonts.py 로 받아 주세요.")
+        ass_kw: Dict[str, Any] = {}
+        if chosen and req.subtitle_style == "reels_clean":
+            ass_kw = {"font": chosen["family"], "bold": chosen["bold"]}
+        elif chosen:
+            ass_kw = {"font": chosen["family"]}
+        subtitles.build_preset_ass(req.subtitle_style, voice.timeline, settings.SUB_DIR / f"{sid}.ass", **ass_kw)
 
         title_lines = list(script["title_lines"])
         project: Dict[str, Any] = {
@@ -185,7 +194,7 @@ def run_pipeline(req: AutoRequest, job_id: str, *, progress: Optional[Progress] 
             thumb_text.grab_frame(Path(cmeta["path"]), float(first["start"]) + 0.4, frame)
             hook = [f"**{title_lines[0].replace('**', '')}**",
                     product.price_text or title_lines[1].replace("**", "")]
-            thumb_text.make_text_thumbnail(frame, hook, thumb_path)
+            thumb_text.make_text_thumbnail(frame, hook, thumb_path, font_path=chosen["path"] if chosen else None)
         except Exception as exc:  # noqa: BLE001  썸네일 실패가 영상 결과를 막으면 안 됨
             warnings.append(f"썸네일을 만들지 못했어요: {exc}")
             thumb_path = None

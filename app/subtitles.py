@@ -321,12 +321,14 @@ def is_emphasis(chunk: str) -> bool:
 
 def build_reels_clean_ass(segments: Iterable[Dict[str, Any]], out_path: Path, font: Optional[str] = None,
                           size: int = 72, outline: int = 2, shadow: int = 3, y_ratio: float = 0.55,
-                          chunk_chars: int = 9, emph_scale: float = 1.25) -> Path:
+                          chunk_chars: int = 9, emph_scale: float = 1.25, bold: bool = True) -> Path:
     """깔끔 버전: 얇은 외곽선 + 부드러운 그림자, 핵심어(숫자·키워드·**표시**)는 노랑 + 크게."""
     size = int(max(68, min(76, size)))
     font = font or pick_sub_font()[0]
     header = REELS_HEADER.format(font=font, size=size, outline=int(outline), shadow=int(shadow))
     header = header.replace("&H78000000", "&H96000000")        # 그림자 색(반투명 검정)
+    if not bold:                                                # 이미 굵은 폰트(블랙한산스 등)는 가짜 볼드 금지
+        header = header.replace(",&H96000000,-1,0,", ",&H96000000,0,0,")
     y = int(round(1920 * max(0.3, min(0.8, y_ratio))))
     lines: List[str] = [header]
     for ev in reels_events(segments, chunk_chars):

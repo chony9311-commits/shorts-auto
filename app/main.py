@@ -39,7 +39,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import bot, pipeline, script_gen, scraper, settings, source_fetcher, store, subtitles
+from . import bot, fonts as fontcat, pipeline, script_gen, scraper, settings, source_fetcher, store, subtitles
 from .batch_queue import BatchQueue
 from .presets import TITLE_PRESETS, list_font_files, presets_public, resolve_font
 from .render import (RenderError, media_tools_ready, probe_duration, probe_media,
@@ -122,6 +122,7 @@ def api_state() -> Dict[str, Any]:
         ],
         "voices": KOREAN_VOICES,
         "subtitle_presets": [{"key": k, "label": v.get("label", k)} for k, v in subtitles.SUBTITLE_PRESETS.items()],
+        "sub_fonts": fontcat.public_list(),
         "default_subtitle_preset": subtitles.DEFAULT_AUTO_SUBTITLE_PRESET,
         "auto": {"voices": script_gen.VOICES, "rate": script_gen.DEFAULT_RATE,
                  "crop_pct": source_fetcher.CROP_DEFAULT, "telegram": bool(os.getenv("TELEGRAM_BOT_TOKEN"))},
@@ -385,7 +386,7 @@ BATCH = BatchQueue()
 
 def _auto_defaults(p: Dict[str, Any]) -> Dict[str, Any]:
     """폼 공통 옵션(성우·속도·크롭·자막)만 추려 요청에 병합한다."""
-    keys = ("voice", "rate", "crop_pct", "subtitle_style", "title_preset", "title_bar", "auto_search")
+    keys = ("voice", "rate", "crop_pct", "subtitle_style", "sub_font", "title_preset", "title_bar", "auto_search")
     return {k: p[k] for k in keys if p.get(k) not in (None, "")}
 
 
